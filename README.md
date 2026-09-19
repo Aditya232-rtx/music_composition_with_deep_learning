@@ -124,9 +124,24 @@ Trained with `trainNetwork` + `trainingOptions('adam', ...)` — many-to-one nex
 
 Deliverables from this run: [`generated_song_2ep.mid`](matlab_src/generated_song_2ep.mid), [`generated_song_2ep.mp3`](matlab_src/generated_song_2ep.mp3), [`trained_music_lstm_2ep.mat`](matlab_src/trained_music_lstm_2ep.mat).
 
-### 20-epoch run
+### 20-epoch run (full result, ~3h27m on a single CPU)
 
-A longer run (20 epochs, ~3 hours on a single CPU core budget) is the fuller result — see the repo for `*_20ep` files once training completes; this README will be updated with the final numbers and curve.
+![Training curves - 20 epoch](matlab_src/training_curves_20ep.png)
+
+| Metric | Value | vs. random baseline | vs. 2-epoch checkpoint |
+|---|---|---|---|
+| Final validation loss | 4.6414 | random guess ≈ 6.79 | 4.85 → 4.64 |
+| Best validation loss | 4.6224 | — | — |
+| Final validation accuracy | 6.66% | random guess ≈ 0.11% (≈ 60× better than chance) | 4.2% → 6.66% |
+| Best validation accuracy | 6.97% | — | — |
+| Total iterations | 78,860 (20 epochs × 3,943 iter/epoch) | — | 7,886 (2 epochs) |
+| Generated notes | 190 | — | 198 |
+| Unique duration values used | **14** | competitor: 1 (hardcoded) | 9 |
+| Pitch range used | 25-95 | — | 31-100 |
+
+The loss/accuracy curves show healthy, monotonic improvement that's clearly flattening by the end — consistent with what a single-layer, fixed-learning-rate 256-unit LSTM on an 885-class vocabulary should look like without learning-rate decay or added capacity (see [Future work](#future-work)). Notably, the *rhythmic variety* of the generated output kept improving even as raw accuracy plateaued — 14 distinct duration values vs. 9 at the 2-epoch checkpoint, both far ahead of the competing submission's single hardcoded value.
+
+Deliverables from this run: [`generated_song_20ep.mid`](matlab_src/generated_song_20ep.mid), [`generated_song_20ep.mp3`](matlab_src/generated_song_20ep.mp3), [`trained_music_lstm_20ep.mat`](matlab_src/trained_music_lstm_20ep.mat), [`training_info_20ep.mat`](matlab_src/training_info_20ep.mat).
 
 ### A note on comparing metrics across architectures
 
@@ -197,7 +212,11 @@ More detail, including a troubleshooting table for the likeliest failure points,
     ├── dataset_subset/             — 145-file, 58-composer training subset
     ├── generated_song_2ep.mid/.mp3 — 2-epoch checkpoint output
     ├── trained_music_lstm_2ep.mat  — 2-epoch trained model + vocab
-    └── training_curves_2ep.png     — 2-epoch loss/accuracy plot
+    ├── training_curves_2ep.png     — 2-epoch loss/accuracy plot
+    ├── generated_song_20ep.mid/.mp3 — 20-epoch (full) run output
+    ├── trained_music_lstm_20ep.mat  — 20-epoch trained model + vocab
+    ├── training_curves_20ep.png     — 20-epoch loss/accuracy plot
+    └── training_info_20ep.mat       — raw per-iteration training history
 ```
 
 ---
