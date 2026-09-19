@@ -4,6 +4,8 @@ A MATLAB submission for the **MathWorks AI Challenge 2025** — Project #243, *"
 
 A supervised LSTM learns to predict the next note in a piano performance (trained on a diverse subset of the [MAESTRO](https://magenta.tensorflow.org/datasets/maestro) dataset), then generates a brand-new composition autoregressively and exports it as a playable MIDI file / MP3.
 
+**Project status: complete.** Three training runs are documented end-to-end in [Results](#results) — a fast 2-epoch checkpoint, a full 20-epoch single-layer run, and a 5-epoch stacked-LSTM+dropout+LR-decay architecture comparison — along with an honest, math-backed analysis of what it would actually take to reach much higher accuracy targets (spoiler: not achievable via more epochs alone on this task).
+
 ---
 
 ## Table of Contents
@@ -143,6 +145,66 @@ The loss/accuracy curves show healthy, monotonic improvement that's clearly flat
 
 Deliverables from this run: [`generated_song_20ep.mid`](matlab_src/generated_song_20ep.mid), [`generated_song_20ep.mp3`](matlab_src/generated_song_20ep.mp3), [`trained_music_lstm_20ep.mat`](matlab_src/trained_music_lstm_20ep.mat), [`training_info_20ep.mat`](matlab_src/training_info_20ep.mat).
 
+### 5-epoch stacked-architecture run (upgraded model, ~94.6 minutes)
+
+After the 20-epoch single-layer run, we upgraded the architecture to see how much a deeper model with regularization and a learning-rate schedule could buy within a much smaller epoch budget:
+
+```matlab
+sequenceInputLayer(1)
+lstmLayer(256, 'OutputMode', 'sequence')
+dropoutLayer(0.3)
+lstmLayer(128, 'OutputMode', 'last')
+dropoutLayer(0.3)
+fullyConnectedLayer(numClasses)
+softmaxLayer
+classificationLayer
+```
+
+Plus piecewise learning-rate decay (halves every ~⅓ of `MaxEpochs`). At `MaxEpochs=5` this schedule is aggressive (LR halves every single epoch, reaching `6.25e-5` by epoch 5) — appropriate for a short run, not a design meant for direct apples-to-apples iteration-for-iteration comparison with the single-layer runs.
+
+![Training curves - 5 epoch stacked](matlab_src/training_curves_5ep_stacked.png)
+
+| Metric | Value |
+|---|---|
+| Final validation loss | 4.7377 |
+| Best validation loss | 4.7367 |
+| Final validation accuracy | 4.81% |
+| Best validation accuracy | 4.88% |
+| Total iterations | 19,715 (5 epochs × 3,943 iter/epoch) |
+| Generated notes | 192 |
+| Unique duration values used | 11 |
+| Pitch range used | 31-104 |
+
+Deliverables from this run: [`generated_song_5ep_stacked.mid`](matlab_src/generated_song_5ep_stacked.mid), [`generated_song_5ep_stacked.mp3`](matlab_src/generated_song_5ep_stacked.mp3), [`trained_music_lstm_5ep_stacked.mat`](matlab_src/trained_music_lstm_5ep_stacked.mat), [`training_info_5ep_stacked.mat`](matlab_src/training_info_5ep_stacked.mat).
+
+### Three-run summary
+
+| | 2-epoch (single-layer) | 20-epoch (single-layer) | 5-epoch (stacked + dropout + LR decay) |
+|---|---|---|---|
+| Iterations | 7,886 | 78,860 | 19,715 |
+| Wall time (single CPU) | ~18 min | ~3h27m | ~94.6 min |
+| Final val. loss | 4.85 | **4.64** | 4.74 |
+| Final val. accuracy | 4.2% | **6.66%** | 4.81% |
+| Unique durations generated | 9 | **14** | 11 |
+
+At equal-ish wall-clock/iteration budgets, the plain single-layer model actually reached the best numbers here — the stacked+dropout model's regularization trades away some raw fit for generalization headroom that a 5-epoch run is too short to cash in on, and its aggressive per-epoch LR decay (tuned for a short run) likely capped how much it could still learn by the final epoch. This is a useful, honest finding in its own right: **architecture upgrades don't pay off automatically — they need an epoch budget and LR schedule actually suited to them**, which is exactly why we didn't extrapolate a rosy number for a longer run without evidence (see below).
+
+### How many epochs would it take to reach 55-65% accuracy / 0.6-0.8 loss?
+
+We fit a log-linear decay curve (`loss ≈ a - b·ln(iterations)`) to the single-layer run's two real, measured data points (iteration 50: loss 5.39; iteration 78,860: loss 4.64) and solved for the iteration count needed to reach a loss of 0.6-0.8:
+
+```
+loss(iter) = 5.7885 - 0.1019 * ln(iter)
+
+target loss 0.8  ->  iterations ≈ 1.86 × 10^21   (≈ 4.7 × 10^17 epochs)
+target loss 0.7  ->  iterations ≈ 4.97 × 10^21   (≈ 1.3 × 10^18 epochs)
+target loss 0.6  ->  iterations ≈ 1.33 × 10^22   (≈ 3.4 × 10^18 epochs)
+```
+
+At our measured throughput (~4 iter/s), the smallest of these (loss 0.8) would take on the order of **10^13 years** — roughly a thousand times the current age of the universe. That number is obviously not a real estimate of anything achievable; it's the honest result of extrapolating our actual measured trend, and it demonstrates something important: **the loss curve's current decay rate cannot reach 0.6-0.8 through more epochs alone, on this architecture, on this data, at any practically reachable epoch count.** Real training curves eventually plateau rather than following log-linear decay forever, which only reinforces the conclusion rather than undermining it.
+
+The 0.35-0.87 loss / 75-87% accuracy figures sometimes cited for LSTM music models come from a different task: pitch-only prediction over a much smaller vocabulary (~128 classes vs. our 885), often on narrow, single-composer datasets where high accuracy partly reflects memorization rather than generalization (a risk explicitly called out in the literature we reviewed). Reaching that range legitimately, on data this diverse, would require a fundamentally different setup — e.g., decomposing the joint (pitch, duration) prediction into two smaller-vocabulary heads, a much larger model trained on much more data, or intentionally narrowing the dataset (with the tradeoffs that implies) — not simply running our current architecture for more epochs.
+
 ### A note on comparing metrics across architectures
 
 The existing GAN submission reports `LossDiscriminator=0.6753, LossGenerator=0.1106` after 50 epochs — **not directly comparable** to our cross-entropy loss. GAN adversarial loss and supervised cross-entropy are different mathematical quantities on different scales measuring different things; a smaller number on one doesn't mean "better" on the other. Their own training curve (reproduced in our analysis) shows generator loss flat at ~0.11 from epoch 1 through 50 while discriminator loss oscillates with no convergence — a common signature of a generator that found a trivial shortcut early rather than genuinely learning the data distribution, not evidence of a strong result despite the small number.
@@ -216,7 +278,11 @@ More detail, including a troubleshooting table for the likeliest failure points,
     ├── generated_song_20ep.mid/.mp3 — 20-epoch (full) run output
     ├── trained_music_lstm_20ep.mat  — 20-epoch trained model + vocab
     ├── training_curves_20ep.png     — 20-epoch loss/accuracy plot
-    └── training_info_20ep.mat       — raw per-iteration training history
+    ├── training_info_20ep.mat       — raw per-iteration training history
+    ├── generated_song_5ep_stacked.mid/.mp3 — stacked-architecture run output
+    ├── trained_music_lstm_5ep_stacked.mat  — stacked model + vocab
+    ├── training_curves_5ep_stacked.png     — stacked-run loss/accuracy plot
+    └── training_info_5ep_stacked.mat       — raw per-iteration training history
 ```
 
 ---
