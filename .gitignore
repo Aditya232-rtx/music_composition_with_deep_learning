@@ -1,0 +1,13 @@
+# Full raw MAESTRO dataset (download separately, see README) - too large for git
+maestro_data/
+
+# Mid-training checkpoints (intermediate, not final results)
+matlab_src/checkpoints/
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# MATLAB
+*.asv
+*.autosave
