@@ -201,7 +201,15 @@ target loss 0.7  ->  iterations ≈ 4.97 × 10^21   (≈ 1.3 × 10^18 epochs)
 target loss 0.6  ->  iterations ≈ 1.33 × 10^22   (≈ 3.4 × 10^18 epochs)
 ```
 
-At our measured throughput (~4 iter/s), the smallest of these (loss 0.8) would take on the order of **10^13 years** — roughly a thousand times the current age of the universe. That number is obviously not a real estimate of anything achievable; it's the honest result of extrapolating our actual measured trend, and it demonstrates something important: **the loss curve's current decay rate cannot reach 0.6-0.8 through more epochs alone, on this architecture, on this data, at any practically reachable epoch count.** Real training curves eventually plateau rather than following log-linear decay forever, which only reinforces the conclusion rather than undermining it.
+This is an iteration-count problem, not a throughput problem, which matters because it means **faster hardware doesn't close the gap.** GPU acceleration only changes iterations-per-second, not the number of iterations the curve says are needed:
+
+| Hardware | Rate | Time to reach loss 0.8 |
+|---|---|---|
+| Current CPU baseline | 4 iter/s | ~1.5 × 10^13 years |
+| Optimistic 1000x GPU speedup | 4,000 iter/s | ~1.5 × 10^10 years |
+| Extreme, unrealistic 10,000x speedup | 40,000 iter/s | ~1.5 × 10^9 years |
+
+(Real GPU speedups for LSTM workloads over a laptop CPU are typically 10-50x, not 1,000-10,000x — those rows are deliberately generous upper bounds, and even they don't get anywhere close to a practical timeframe.) The conclusion holds regardless of hardware: **the loss curve's current decay rate cannot reach 0.6-0.8 through more training alone, on this architecture, on this data.** Real training curves also eventually plateau rather than following log-linear decay forever, which only reinforces the conclusion rather than undermining it.
 
 The 0.35-0.87 loss / 75-87% accuracy figures sometimes cited for LSTM music models come from a different task: pitch-only prediction over a much smaller vocabulary (~128 classes vs. our 885), often on narrow, single-composer datasets where high accuracy partly reflects memorization rather than generalization (a risk explicitly called out in the literature we reviewed). Reaching that range legitimately, on data this diverse, would require a fundamentally different setup — e.g., decomposing the joint (pitch, duration) prediction into two smaller-vocabulary heads, a much larger model trained on much more data, or intentionally narrowing the dataset (with the tradeoffs that implies) — not simply running our current architecture for more epochs.
 
