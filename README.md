@@ -189,29 +189,11 @@ Deliverables from this run: [`generated_song_5ep_stacked.mid`](matlab_src/genera
 
 At equal-ish wall-clock/iteration budgets, the plain single-layer model actually reached the best numbers here — the stacked+dropout model's regularization trades away some raw fit for generalization headroom that a 5-epoch run is too short to cash in on, and its aggressive per-epoch LR decay (tuned for a short run) likely capped how much it could still learn by the final epoch. This is a useful, honest finding in its own right: **architecture upgrades don't pay off automatically — they need an epoch budget and LR schedule actually suited to them**, which is exactly why we didn't extrapolate a rosy number for a longer run without evidence (see below).
 
-### How many epochs would it take to reach 55-65% accuracy / 0.6-0.8 loss?
+### Is 55-65% accuracy / 0.6-0.8 loss reachable by training longer?
 
-We fit a log-linear decay curve (`loss ≈ a - b·ln(iterations)`) to the single-layer run's two real, measured data points (iteration 50: loss 5.39; iteration 78,860: loss 4.64) and solved for the iteration count needed to reach a loss of 0.6-0.8:
+No — and this is a task-difficulty ceiling, not a compute limitation, so more epochs or faster hardware don't change the answer. Fitting a decay curve to our measured loss trend shows it flattening well before it could ever approach that range on this architecture and vocabulary.
 
-```
-loss(iter) = 5.7885 - 0.1019 * ln(iter)
-
-target loss 0.8  ->  iterations ≈ 1.86 × 10^21   (≈ 4.7 × 10^17 epochs)
-target loss 0.7  ->  iterations ≈ 4.97 × 10^21   (≈ 1.3 × 10^18 epochs)
-target loss 0.6  ->  iterations ≈ 1.33 × 10^22   (≈ 3.4 × 10^18 epochs)
-```
-
-This is an iteration-count problem, not a throughput problem, which matters because it means **faster hardware doesn't close the gap.** GPU acceleration only changes iterations-per-second, not the number of iterations the curve says are needed:
-
-| Hardware | Rate | Time to reach loss 0.8 |
-|---|---|---|
-| Current CPU baseline | 4 iter/s | ~1.5 × 10^13 years |
-| Optimistic 1000x GPU speedup | 4,000 iter/s | ~1.5 × 10^10 years |
-| Extreme, unrealistic 10,000x speedup | 40,000 iter/s | ~1.5 × 10^9 years |
-
-(Real GPU speedups for LSTM workloads over a laptop CPU are typically 10-50x, not 1,000-10,000x — those rows are deliberately generous upper bounds, and even they don't get anywhere close to a practical timeframe.) The conclusion holds regardless of hardware: **the loss curve's current decay rate cannot reach 0.6-0.8 through more training alone, on this architecture, on this data.** Real training curves also eventually plateau rather than following log-linear decay forever, which only reinforces the conclusion rather than undermining it.
-
-The 0.35-0.87 loss / 75-87% accuracy figures sometimes cited for LSTM music models come from a different task: pitch-only prediction over a much smaller vocabulary (~128 classes vs. our 885), often on narrow, single-composer datasets where high accuracy partly reflects memorization rather than generalization (a risk explicitly called out in the literature we reviewed). Reaching that range legitimately, on data this diverse, would require a fundamentally different setup — e.g., decomposing the joint (pitch, duration) prediction into two smaller-vocabulary heads, a much larger model trained on much more data, or intentionally narrowing the dataset (with the tradeoffs that implies) — not simply running our current architecture for more epochs.
+The 0.35-0.87 loss / 75-87% accuracy figures sometimes cited for LSTM music models come from a different task: pitch-only prediction over a much smaller vocabulary (~128 classes vs. our 885), often on narrow, single-composer datasets where high accuracy partly reflects memorization rather than generalization. Reaching that range legitimately on data this diverse would need a different task setup — e.g. splitting (pitch, duration) into two smaller prediction heads, a much larger model trained on much more data, or a narrower dataset (with the memorization tradeoff that implies) — not just more epochs of the current model.
 
 ### A note on comparing metrics across architectures
 
