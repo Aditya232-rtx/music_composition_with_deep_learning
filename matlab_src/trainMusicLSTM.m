@@ -8,9 +8,11 @@ function [net, info] = trainMusicLSTM(Xcell, Ycat, numClasses, maxEpochs, miniBa
 %                   count/overhead on big datasets - bump this up when
 %                   training on hundreds of thousands of windows)
 %
-%   Stacked 2-layer LSTM (256 -> 128) with dropout, plus piecewise
-%   learning-rate decay - upgrade from the earlier single-layer, fixed-LR
-%   version to squeeze more out of the same epoch budget.
+%   Single-layer, fixed-learning-rate architecture - this was the
+%   best-performing config measured so far (beat a stacked+dropout+LR-decay
+%   variant at a comparable epoch budget). Kept deliberately unchanged here
+%   so the vocabulary-reduction experiment (see buildTokenDataset.m) is an
+%   isolated, single-variable comparison against the earlier 20-epoch run.
 
 if nargin < 4, maxEpochs = 18; end
 if nargin < 5, miniBatchSize = 64; end
@@ -26,15 +28,10 @@ nVal = max(1, round(0.1*n));
 valIdx = idx(1:nVal);
 trainIdx = idx(nVal+1:end);
 
-lrDropPeriod = max(1, floor(maxEpochs/3));
-
 options = trainingOptions('adam', ...
     'MaxEpochs', maxEpochs, ...
     'MiniBatchSize', miniBatchSize, ...
     'InitialLearnRate', 1e-3, ...
-    'LearnRateSchedule', 'piecewise', ...
-    'LearnRateDropFactor', 0.5, ...
-    'LearnRateDropPeriod', lrDropPeriod, ...
     'GradientThreshold', 1, ...
     'Shuffle', 'every-epoch', ...
     'ValidationData', {Xcell(valIdx), Ycat(valIdx)}, ...
@@ -58,10 +55,7 @@ if ~isempty(resumeFile)
 else
     layers = [
         sequenceInputLayer(1)
-        lstmLayer(256, 'OutputMode', 'sequence')
-        dropoutLayer(0.3)
-        lstmLayer(128, 'OutputMode', 'last')
-        dropoutLayer(0.3)
+        lstmLayer(256, 'OutputMode', 'last')
         fullyConnectedLayer(numClasses)
         softmaxLayer
         classificationLayer];

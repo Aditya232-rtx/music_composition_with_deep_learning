@@ -21,11 +21,12 @@ totalTimer = tic;
 %% Config
 datasetDir    = 'dataset_subset';   % folder of MAESTRO MIDI files
 windowLen     = 32;                 % context length for next-token prediction
-outMidiFile   = 'generated_song_5ep_stacked.mid';
+outMidiFile   = 'generated_song_20ep_reduced_vocab.mid';
 genLength     = 200;                % total tokens in the generated piece
 temperature   = 1.0;
-maxEpochs     = 5;                  % comparison run for the upgraded stacked
-                                     % LSTM + dropout + LR-decay architecture
+maxEpochs     = 20;                 % matches the best-performing prior run
+                                     % (single-layer, 885-class) for a clean,
+                                     % single-variable vocab-size comparison
 miniBatchSize = 128;                % larger batches reduce iteration overhead at this scale
 
 %% 1. Tokenize the dataset
@@ -46,12 +47,12 @@ fprintf('Window building took %.1f s\n', toc(tWindows));
 tTrain = tic;
 [net, info] = trainMusicLSTM(Xcell', Ycat, numClasses, maxEpochs, miniBatchSize);
 fprintf('Training took %.1f s\n', toc(tTrain));
-save('trained_music_lstm_5ep_stacked.mat', 'net', 'vocabMap', 'bucketEdges', 'windowLen');
-fprintf('Model trained and saved to trained_music_lstm_5ep_stacked.mat\n');
+save('trained_music_lstm_20ep_reduced_vocab.mat', 'net', 'vocabMap', 'bucketEdges', 'windowLen');
+fprintf('Model trained and saved to trained_music_lstm_20ep_reduced_vocab.mat\n');
 
 %% 3b. Save training curves + raw history
-plotTrainingHistory(info, 'training_curves_5ep_stacked.png');
-save('training_info_5ep_stacked.mat', 'info');
+plotTrainingHistory(info, 'training_curves_20ep_reduced_vocab.png');
+save('training_info_20ep_reduced_vocab.mat', 'info');
 
 %% 4. Generate a new sequence, seeded from a real opening phrase
 seed = tokenSeqs{1}(1:min(windowLen, numel(tokenSeqs{1})));

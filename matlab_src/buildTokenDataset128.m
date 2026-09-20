@@ -1,24 +1,10 @@
-function [tokenSeqs, vocabMap, bucketEdges, numClasses] = buildTokenDataset(midiFiles)
-%BUILDTOKENDATASET Parse MIDI files and tokenize as (pitch-class, register-band, IOI-bucket) triples.
-%   midiFiles   - cellstr of full paths to .mid files
-%   tokenSeqs   - cell array, one integer token-index vector per file
-%   vocabMap    - containers.Map: 'pitchClass_band_bucket' key -> token index (1 = REST)
-%   bucketEdges - inter-onset-interval bucket edges in seconds, shared by
-%                 both tokenization here and decoding in tokensToMidi.m
-%   numClasses  - size of the vocabulary (max token index)
-%
-%   Reduced-vocabulary tokenization: pitch is collapsed from the full
-%   0-127 MIDI range down to (pitch class 0-11) x (register band
-%   low/mid/high), and duration is collapsed to 5 coarse buckets instead
-%   of 11. A piano piece doesn't need per-semitone-per-octave resolution
-%   to sound coherent, and a much smaller vocabulary (~181 classes vs.
-%   885) gives a single-layer LSTM a realistic shot at noticeably better
-%   loss/accuracy within a practical epoch budget - see README for the
-%   full before/after comparison.
-%
-%   Vectorized: keys are packed into a single integer
-%   (pitchClass*1000 + band*100 + bucket) and vocab indices are resolved
-%   via a direct array lookup instead of a containers.Map hit per note.
+function [tokenSeqs, vocabMap, bucketEdges, numClasses] = buildTokenDataset128(midiFiles)
+%BUILDTOKENDATASET128 Parse MIDI files and tokenize as (pitch-class, register-band, IOI-bucket) triples.
+%   Same scheme as buildTokenDataset.m but with 2 register bands instead
+%   of 3 (12 pitch classes x 2 bands x 5 duration buckets + 1 REST = 121
+%   classes) - a further vocabulary reduction experiment, paired with a
+%   20-composer dataset subset (dataset_subset_20composers/) instead of
+%   the full 58-composer one.
 
 bucketEdges = [0, 0.15, 0.35, 0.7, 1.5, Inf];
 numBuckets = numel(bucketEdges) - 1;
@@ -43,10 +29,7 @@ for i = 1:numel(midiFiles)
     end
 end
 
-% ---- Build vocabulary over all (pitchClass, band, bucket) triples actually seen ----
-% key space is bounded (pitchClass 0-11, band 0-2, bucket 1-numBuckets),
-% so a direct array lookup replaces per-note containers.Map get/set calls.
-maxKey = 11*1000 + 2*100 + numBuckets;
+maxKey = 11*1000 + 1*100 + numBuckets;
 keyToIdx = zeros(maxKey, 1);
 nextIdx = 2; % 1 is reserved for REST
 
@@ -64,7 +47,6 @@ for i = 1:numel(rawSeqs)
 end
 numClasses = nextIdx - 1;
 
-% ---- Build vocabMap ('pitchClass_band_bucket' -> index) for tokensToMidi decoding ----
 vocabMap = containers.Map('KeyType', 'char', 'ValueType', 'double');
 vocabMap('REST') = 1;
 seenKeys = find(keyToIdx > 0);
@@ -77,7 +59,6 @@ for k = 1:numel(seenKeys)
     vocabMap(sprintf('%d_%d_%d', pitchClassVal, bandVal, bucketVal)) = keyToIdx(key);
 end
 
-% ---- Convert each file's sequence to token indices (vectorized) ----
 tokenSeqs = cell(numel(rawSeqs), 1);
 for i = 1:numel(rawSeqs)
     seq = rawSeqs{i};
@@ -91,8 +72,7 @@ fprintf('Vocabulary size: %d | usable sequences: %d\n', numClasses, numel(tokenS
 end
 
 function band = pitchToBand(pitch)
-%PITCHTOBAND Collapse absolute MIDI pitch into a coarse register: 0=low, 1=mid, 2=high.
+%PITCHTOBAND Collapse absolute MIDI pitch into a coarse register: 0=low, 1=high.
 band = zeros(size(pitch));
-band(pitch >= 48 & pitch < 72) = 1;
-band(pitch >= 72) = 2;
+band(pitch >= 60) = 1;
 end

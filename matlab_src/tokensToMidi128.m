@@ -1,11 +1,8 @@
-function tokensToMidi(tokenSeq, vocabMap, bucketEdges, outFile)
-%TOKENSTOMIDI Decode a generated token sequence into notes and write a MIDI file.
-%   tokenSeq    - vector of token indices (from generateSequence)
-%   vocabMap    - the containers.Map produced by buildTokenDataset
-%   bucketEdges - the same bucket edges used to build vocabMap
-%   outFile     - output .mid path
+function tokensToMidi128(tokenSeq, vocabMap, bucketEdges, outFile)
+%TOKENSTOMIDI128 Decode a generated token sequence into notes and write a MIDI file.
+%   Paired with buildTokenDataset128.m's 2-register-band scheme.
 
-% Build reverse lookup: token index -> 'pitch_bucket' (or 'REST')
+% Build reverse lookup: token index -> 'pitchClass_band_bucket' (or 'REST')
 keysList = keys(vocabMap);
 valsList = values(vocabMap);
 reverseMap = containers.Map('KeyType','double','ValueType','char');
@@ -42,7 +39,7 @@ for i = 1:numel(tokenSeq)
 end
 
 if isempty(notes)
-    error('tokensToMidi:noNotes', 'Decoded zero notes - check vocabMap/tokenSeq consistency.');
+    error('tokensToMidi128:noNotes', 'Decoded zero notes - check vocabMap/tokenSeq consistency.');
 end
 
 writeMidiFile(notes, outFile);
@@ -50,8 +47,7 @@ end
 
 function pitch = bandToAnchorPitch(band)
 %BANDTOANCHORPITCH Representative base MIDI pitch for a register band
-%   (matches the low/mid/high split in buildTokenDataset.m's pitchToBand).
-%   Adding a pitch class (0-11) lands within or near the original band.
-anchors = [36, 60, 84]; % band 0=low, 1=mid, 2=high
+%   (matches the low/high split in buildTokenDataset128.m's pitchToBand).
+anchors = [48, 72]; % band 0=low, 1=high
 pitch = anchors(band + 1);
 end
