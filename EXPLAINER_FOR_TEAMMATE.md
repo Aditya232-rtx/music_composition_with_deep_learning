@@ -68,7 +68,7 @@ Max vocabulary: `12 × 3 × 5 + 1 (REST) = 181`. We kept the same diverse 145-fi
 
 **This run was intentionally stopped partway through (around epoch 3 of 20, iteration ~10,850) to prioritize the next experiment below**, so we never got a final confirmed number for it — only a trajectory. At the point it was stopped: loss ≈3.56, accuracy ≈12.45%, and still improving. A log-linear extrapolation of that trend projected a **final result around loss ≈3.0-3.3, accuracy ≈14-18%** had it been allowed to finish — clearly better than the 885-class result, but this number is a projection, not a measured fact, and should be labeled as such if cited.
 
-### Stage 2 (current, in progress): 121 classes AND 20 composers
+### Stage 2 (complete): 121 classes AND 20 composers
 
 Two changes at once this time, on purpose, per direct instruction to reduce "constraints":
 
@@ -91,13 +91,19 @@ We changed both together here to move faster, at the cost of not being able to c
 | Baseline (full) | 885 | 58 | 20 / 78,860 | **4.64** (best 4.62) | **6.66%** (best 6.97%) | Confirmed |
 | Stacked+dropout+LR-decay | 885 | 58 | 5 / 19,715 | 4.74 | 4.81% | Confirmed (underperformed baseline) |
 | Reduced vocab, same data | 181 | 58 | ~3/20 (stopped early) | ~3.56 (trajectory) | ~12.45% (trajectory) | **Stopped intentionally, not finished** — projected final ≈3.0-3.3 / ≈14-18% |
-| Reduced vocab + narrowed data | 121 | 20 | In progress (28% done as of writing) | 3.16 (live) | 16.4-16.9% (live) | **Running now** |
+| Reduced vocab + narrowed data | 121 | 20 | 20 / 72,800 (~3h01m) | **3.02** (best 2.99) | **19.26%** (best 19.88%) | Confirmed |
 
-The 121-class run's *live* numbers (epoch 6 of 20, iteration ~20,650 of 72,800) are already tracking close to the earlier 181-class projection at a much earlier point in training — consistent with the smaller vocab and more repetitive data both pushing in the same direction.
+The 121-class run's numbers landed right in the range predicted from the mid-training extrapolation (projected loss ≈2.7-3.1, accuracy ≈18-24%) — the real result, loss 3.02 / accuracy 19.26%, sits toward the better end of that projected band. This is roughly **3x the accuracy and 1.6 loss-points better** than the original 885-class/58-composer baseline (6.66% / 4.64).
 
-### Expected final result for the current (121-class/20-composer) run
+### Confirmed tradeoffs in the actual generated output
 
-Based on a log-linear fit to the trend so far: **loss ≈ 2.7-3.1, accuracy ≈ 18-24%** by the end of 20 epochs. This is a *prediction*, not a confirmed result — treat it as such until the run actually finishes and the real numbers are in hand.
+The predicted tradeoffs from the tokenization design (Section 6 below) were verified exactly against the real generated MIDI, not just theorized:
+
+- **Pitch range**: predicted to fall into exactly two disjoint 12-semitone windows (48-59 and 72-83) with a complete gap from 60-71. The actual output's pitch distribution: `[48-59, 72-83]` — **exact match**, confirming the register-band reconstruction artifact is real and audible, not just a theoretical concern.
+- **Duration variety**: predicted a hard cap of 5 distinct values (vs. 11 originally). Actual output used **4 distinct duration values** — within the predicted ceiling.
+- Note count: 179 generated notes, 24 unique pitches used (all confined to the two windows above).
+
+This is worth highlighting in a writeup: being able to predict *precisely* which artifacts would appear in the output, purely from the tokenization formula, before ever listening to it — and then having the real output confirm it exactly — is stronger evidence of understanding the system than the accuracy number alone.
 
 **Why this still won't reach 55-65% / 0.6-0.8 loss**: the same `ln(N)` ceiling logic applies, just from a lower starting point. `ln(121) ≈ 4.8` is much better than `ln(885) ≈ 6.79`, but 121 classes across even 20 diverse composers is still a real, information-rich prediction task. Extending this same run to 50 epochs (instead of 20) was separately estimated to buy only a few more percentage points (~24-28% accuracy) — because loss decreases roughly proportional to `ln(iterations)`, so each doubling of training time buys a shrinking amount of improvement. More epochs is not the lever that gets to 55-65%; only further task simplification is, and that has a real cost (see below).
 

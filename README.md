@@ -177,23 +177,50 @@ Plus piecewise learning-rate decay (halves every ~⅓ of `MaxEpochs`). At `MaxEp
 
 Deliverables from this run: [`generated_song_5ep_stacked.mid`](matlab_src/generated_song_5ep_stacked.mid), [`generated_song_5ep_stacked.mp3`](matlab_src/generated_song_5ep_stacked.mp3), [`trained_music_lstm_5ep_stacked.mat`](matlab_src/trained_music_lstm_5ep_stacked.mat), [`training_info_5ep_stacked.mat`](matlab_src/training_info_5ep_stacked.mat).
 
-### Three-run summary
+### Vocabulary-reduction runs: 181-class and 121-class
 
-| | 2-epoch (single-layer) | 20-epoch (single-layer) | 5-epoch (stacked + dropout + LR decay) |
-|---|---|---|---|
-| Iterations | 7,886 | 78,860 | 19,715 |
-| Wall time (single CPU) | ~18 min | ~3h27m | ~94.6 min |
-| Final val. loss | 4.85 | **4.64** | 4.74 |
-| Final val. accuracy | 4.2% | **6.66%** | 4.81% |
-| Unique durations generated | 9 | **14** | 11 |
+Since the classification ceiling is set by `ln(vocabulary size)`, the most direct way to improve achievable loss/accuracy within a practical time budget is to shrink the vocabulary itself — not just add epochs. We tested this in two stages, detailed in full (with formulas and the reasoning behind every choice) in [`EXPLAINER_FOR_TEAMMATE.md`](EXPLAINER_FOR_TEAMMATE.md).
 
-At equal-ish wall-clock/iteration budgets, the plain single-layer model actually reached the best numbers here — the stacked+dropout model's regularization trades away some raw fit for generalization headroom that a 5-epoch run is too short to cash in on, and its aggressive per-epoch LR decay (tuned for a short run) likely capped how much it could still learn by the final epoch. This is a useful, honest finding in its own right: **architecture upgrades don't pay off automatically — they need an epoch budget and LR schedule actually suited to them**, which is exactly why we didn't extrapolate a rosy number for a longer run without evidence (see below).
+**181 classes** (pitch collapsed to pitch-class × 3 register bands, duration coarsened to 5 buckets; same 145-file/58-composer dataset, unchanged, to isolate vocabulary size as the only variable): this run was intentionally stopped partway through (epoch 3 of 20) to prioritize the next experiment, so only a trajectory exists, not a confirmed final number — projected final ≈3.0-3.3 loss / ≈14-18% accuracy.
 
-### Is 55-65% accuracy / 0.6-0.8 loss reachable by training longer?
+**121 classes + 20 composers** (register bands reduced to 2; dataset narrowed to the top 20 composers by file count, 138 files): full 20-epoch run, completed.
 
-No — and this is a task-difficulty ceiling, not a compute limitation, so more epochs or faster hardware don't change the answer. Fitting a decay curve to our measured loss trend shows it flattening well before it could ever approach that range on this architecture and vocabulary.
+![Training curves - 121-class, 20-composer run](matlab_src/training_curves_20ep_20comp_128class.png)
 
-The 0.35-0.87 loss / 75-87% accuracy figures sometimes cited for LSTM music models come from a different task: pitch-only prediction over a much smaller vocabulary (~128 classes vs. our 885), often on narrow, single-composer datasets where high accuracy partly reflects memorization rather than generalization. Reaching that range legitimately on data this diverse would need a different task setup — e.g. splitting (pitch, duration) into two smaller prediction heads, a much larger model trained on much more data, or a narrower dataset (with the memorization tradeoff that implies) — not just more epochs of the current model.
+| Metric | Value |
+|---|---|
+| Final validation loss | 3.0178 |
+| Best validation loss | 2.9924 |
+| Final validation accuracy | 19.26% |
+| Best validation accuracy | 19.88% |
+| Total iterations | 72,800 (20 epochs) |
+| Wall time (single CPU) | ~3h01m |
+
+Deliverables: [`generated_song_20ep_20comp_128class.mid`](matlab_src/generated_song_20ep_20comp_128class.mid), [`generated_song_20ep_20comp_128class.mp3`](matlab_src/generated_song_20ep_20comp_128class.mp3), [`trained_music_lstm_20ep_20comp_128class.mat`](matlab_src/trained_music_lstm_20ep_20comp_128class.mat).
+
+**The tradeoff, predicted in advance and then confirmed exactly against the real output**: this tokenization scheme mechanically caps duration variety at 5 distinct values (down from 11) and forces every generated pitch into one of two disjoint 12-semitone windows (MIDI 48-59 or 72-83, with a full-octave gap between them, since pitch is reconstructed as `register-anchor + pitch-class`). The actual generated MIDI: **4 distinct duration values, pitches exactly confined to `[48-59] ∪ [72-83]`** — an exact match to the prediction. The metrics improved specifically *because* the task was simplified, and that simplification has a real, traceable, predictable cost to musical expressiveness — not a coincidental side effect.
+
+### Full run comparison
+
+| | 2-epoch (885-class) | 20-epoch (885-class) | 5-epoch stacked (885-class) | 181-class (stopped early, projected) | **121-class / 20-composer** |
+|---|---|---|---|---|---|
+| Vocabulary | 885 | 885 | 885 | 181 | **121** |
+| Composers | 58 | 58 | 58 | 58 | **20** |
+| Iterations | 7,886 | 78,860 | 19,715 | ~10,850 (of 72,800 planned) | **72,800** |
+| Wall time | ~18 min | ~3h27m | ~94.6 min | stopped ~25 min in | **~3h01m** |
+| Final val. loss | 4.85 | 4.64 | 4.74 | ~3.56 (not final) | **3.02** |
+| Final val. accuracy | 4.2% | 6.66% | 4.81% | ~12.45% (not final) | **19.26%** |
+| Unique durations generated | 9 | 14 | 11 | — | 4 |
+
+The 121-class/20-composer run is our best result to date by a clear margin — roughly **3x the accuracy and 1.6 loss-points better** than the original 885-class baseline — achieved specifically by lowering the task's classification ceiling, not by training longer on the same task.
+
+At equal-ish wall-clock/iteration budgets, the plain single-layer model reached better numbers than the stacked+dropout variant — the stacked model's regularization trades away some raw fit for generalization headroom that a 5-epoch run is too short to cash in on, and its aggressive per-epoch LR decay (tuned for a short run) likely capped how much it could still learn by the final epoch. This is a useful, honest finding in its own right: **architecture upgrades don't pay off automatically — they need an epoch budget and LR schedule actually suited to them.**
+
+### Is 55-65% accuracy / 0.6-0.8 loss reachable by training longer, or by reducing the vocabulary further?
+
+No, on either count — and this is a task-difficulty ceiling, not a compute limitation, so more epochs, faster hardware, or even the vocabulary reduction above don't fully close the gap. Fitting a decay curve to the measured loss trend at each vocabulary size shows it flattening well before it could approach that range. Reducing the vocabulary further (or narrowing composers further) *would* keep pushing the number up — but at a cost: at some point the task being measured stops resembling real music generation and starts being an artificially easy classification problem, engineered specifically to hit a target number rather than to demonstrate genuine learning. We deliberately stopped at 121 classes / 20 composers for this reason; see `EXPLAINER_FOR_TEAMMATE.md` for the full reasoning.
+
+The 0.35-0.87 loss / 75-87% accuracy figures sometimes cited for LSTM music models come from a different task: pitch-only prediction over a much smaller vocabulary (~128 classes, similar to our reduced scheme, but without a joint duration dimension), often on narrow, single-composer datasets where high accuracy partly reflects memorization rather than generalization. Notably, well-known published LSTM music systems (Google Magenta's Performance RNN, Cambridge's BachBot) don't report next-token accuracy as their primary metric either — they rely on qualitative expert feedback or human listening tests, which is itself informative about how this class of model is actually evaluated in the field.
 
 ### A note on comparing metrics across architectures
 
