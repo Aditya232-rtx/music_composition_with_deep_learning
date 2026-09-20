@@ -248,7 +248,7 @@ More detail, including a troubleshooting table for the likeliest failure points,
 ```
 .
 ├── README.md                       — this file
-├── music_composition_spec.md       — original build spec / requirements
+├── EXPLAINER_FOR_TEAMMATE.md       — full reasoning writeup: vocab reduction, tradeoffs, run comparison
 └── matlab_src/
     ├── README_RUN_ORDER.md         — step-by-step run guide + troubleshooting
     ├── readMidiNoteOnsets.m        — MIDI file parser
@@ -283,7 +283,7 @@ More detail, including a troubleshooting table for the likeliest failure points,
 - **885-class vocabulary is large for a single-layer LSTM.** Cross-entropy loss numbers should be read relative to the random-guess baseline (ln(885) ≈ 6.79), not against benchmarks from simpler pitch-only (128-class) setups — those aren't the same task.
 - **Velocity is fixed, not modeled.** Both this project and the compared submission use a constant velocity for every generated note — an explicit, matched scope cut in the original spec, not a differentiator.
 - **No chords / polyphony / multi-instrument support** — monophonic next-note prediction only, as scoped.
-- **The full MAESTRO train split (962 files, ~159 hours of audio) was not used** — training was deliberately time-boxed to a diverse 145-file subset. See `music_composition_spec.md` for the original reasoning.
+- **The full MAESTRO train split (962 files, ~159 hours of audio) was not used** — training was deliberately time-boxed to a diverse 145-file subset.
 
 ## Future work
 
